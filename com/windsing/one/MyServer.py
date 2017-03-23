@@ -26,3 +26,6 @@ while True:
     # 创建一个指向我们的handle_client函数的新线程对象，handle_client函数的参数设置为client
     client_handler = threading.Thread(target=handle_client, args=(client,))
     client_handler.start()
+
+
+

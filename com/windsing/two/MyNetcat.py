@@ -4,7 +4,7 @@ import socket
 import getopt
 import subprocess
 
-# 定义全局变量
+# define some global variables
 listen = False
 command = False
 upload = False
@@ -14,7 +14,6 @@ port = 0
 upload_destination = ""
 
 
-# 创建一个负责处理命令行参数的主函数，并调用其余的函数
 def usage():
     print("Net Tool\n")
     print("Usage: MyNetcat.py -t target_host -p port ")
@@ -33,11 +32,16 @@ def usage():
 
 def client_sender(buffer):
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
     try:
+        # connect to our target host
         client.connect((target, port))
-        if len(buffer):
+
+        if len(bytes(buffer)):
             client.send(buffer)
+
         while True:
+            # now wait for data back
             recv_len = 1
             response = ""
             while recv_len:
@@ -48,14 +52,97 @@ def client_sender(buffer):
                     break
             print(response)
 
+            # wait for more input
             buffer = raw_input("")
             buffer += "\n"
+
+            # send it off
             client.send(buffer)
     except:
-        print("异常，退出")
+        print("[*] Exception! Exiting.")
         client.close()
 
-    print()
+
+# Server
+def server_loop():
+    global target
+
+    # if no target is defined, we listen on all interfaces
+    if not len(target):
+        target = "0.0.0.0"
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind((target, port))
+    server.listen(5)
+
+    while True:
+        client_socket, address = server.accept()
+        client_thread = threading.Thread(target=client_handler, args=(client_socket,))
+        client_thread.start()
+
+
+def run_command(command):
+    # trim the newline
+    command = command.rstrip()
+
+    # run the command and get the output back
+    try:
+        subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
+    except:
+        output = "Failed to execute command.\r\n"
+    # send the output back to the client
+    return output
+
+
+def client_handler(client_socket):
+    global command
+    global execute
+    global upload
+
+    # check for upload
+    if len(upload_destination):
+
+        # read in all of the bytes and write to our destination
+        file_buffer = ""
+
+        # keep reading data until none is available
+        while True:
+            data = client_socket.recv(4096)
+            if not data:
+                break
+            else:
+                file_buffer += data
+
+        # now we take these bytes and try to write them out
+        try:
+            file_descriptor = open(upload_destination, "wb")
+            file_descriptor.write(file_buffer)
+            file_descriptor.close()
+
+            # acknowledge that we wrote the file out
+            client_socket.send("Successfully saved file to %s\r\n" % upload_destination)
+        except:
+            client_socket.send(b"save file failed %s" % upload_destination)
+
+    # check for command execution
+    if len(execute):
+        # run the command
+        output = run_command(execute)
+        client_socket.send(output)
+
+    # now we go into another loop if a command shell was requested
+    if command:
+        while True:
+            # show a simple prompt
+            client_socket.sent(b"MyNetcat:#>")
+
+            # now we receive until we see a linefeed(enter key)
+            cmd_buff = ""
+            while "\n" not in cmd_buff:
+                cmd_buff += client_socket.recv(4096)
+
+            # send back the command output
+            response = run_command(cmd_buff)
+            client_socket.send(response)
 
 
 def main():
@@ -106,9 +193,4 @@ def main():
     if listen:
         server_loop()
 
-
 main()
-
-
-def server_loop():
-    print()

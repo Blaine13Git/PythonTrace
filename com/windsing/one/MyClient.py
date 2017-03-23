@@ -17,8 +17,11 @@ print("<<<<<<<<<<<<<<>>>>>>>>>>>>>>")
 
 # sent some data
 # my_client.send(b"GET / HTTP/1.1\r\nHost:dict.youdao.com\n")
-my_client.send(b"hello server 0")
+word = "hello server 0"
+my_client.send(word.encode('utf-8'))
 
 # receive some data
 my_response = my_client.recv(4096)
 print(my_response)
+
+
