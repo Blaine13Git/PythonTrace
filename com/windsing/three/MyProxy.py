@@ -2,9 +2,11 @@ import sys
 import socket
 import threading
 
+from pkg_resources._vendor.appdirs import unicode
+from pygments.util import xrange
+
 
 def server_loop(local_ip, local_port, remote_ip, remote_port, receive_first):
-
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     try:
@@ -26,7 +28,6 @@ def server_loop(local_ip, local_port, remote_ip, remote_port, receive_first):
 
 
 def proxy_handler(client_socket, remote_ip, remote_port, receive_first):
-
     remote_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     remote_socket.connect((remote_ip, remote_port))
 
@@ -62,7 +63,56 @@ def proxy_handler(client_socket, remote_ip, remote_port, receive_first):
         # receive back the response
         remote_buffer = receive_from(remote_socket)
         if len(remote_buffer):
+            print("Received %d bytes from remote." % len(remote_buffer))
+            hexdump(remote_buffer)
 
+            # send to response handler
+            remote_buffer = response_handler(remote_buffer)
+
+            # send the response to local socket
+            client_socket.send(remote_buffer)
+            print("Send to localhost")
+
+        # if no more data on either side, close the connections
+        if not len(local_buffer) or not len(remote_buffer):
+            client_socket.close()
+            remote_socket.close()
+            print(" No more data. Closing connections")
+            break
+
+
+def hexdump(src, length=16):
+    result = []
+    digits = 4 if isinstance(src, unicode) else 2
+
+    for i in xrange(0, len(src), length):
+        s = src[i:i + length]
+        hexa = b''.join(["%0*X" % (digits, ord(x)) for x in s])
+        text = b''.join([x if 0x20 <= ord(x) < 0x7F else b'.' for x in s])
+        result.append(b"%04X %-*s %s" % (i, length * (digits + 1), hexa, text))
+
+    print(b'\n'.join(result))
+
+
+def receive_from(connection):
+    buffer = ""
+    connection.settimeout(2)
+    try:
+        while True:
+            data = connection.recv(4096)
+            if not data:
+                break
+    except:
+        pass
+    return buffer
+
+
+def request_handler(buffer):
+    return buffer
+
+
+def response_handler(buffer):
+    return buffer
 
 
 def main():
